@@ -1,3 +1,0 @@
-# Baumgratz.github.io
-
-Teste
