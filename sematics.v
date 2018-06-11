@@ -299,48 +299,29 @@ Ltac value_solver :=
           | [H : nvalue (And _ _) |- _] => inverts H
           | [H : bvalue (And _ _) |- _] => inverts H
           | [H : Zero ==>> _ |- _] => inverts H
-          end).
+end).
+
+
+
+Ltac big_step_solver :=
+  match goal with
+    | [H  : value (Succ _) |- _] => eapply big_step_value_succ in H; destruct H
+    | [IH : forall v : exp, ?e ==>> v -> forall v': exp, ?e ==>> v' -> _,
+       H1 : ?e ==>> _, 
+       H2 : ?e ==>> _ |- _] => specialize (IH _ H1 _ H2) ; subst 
+    | [ _ : _ |- Succ ?n = Succ ?n ] => auto
+  
+    | [H  : Zero = Succ _ |- _ ] => inverts H
+    | [H  : Succ _ = Zero |- _ ] => inverts H
+    | [H  : Succ ?v = Succ ?v' |- ?v = ?v'] => congruence
+    | [H  : T = F |- _ ] => inverts H
+    | [H  : F = T |- _ ] => inverts H
+    | [H  : Succ _ = Succ _ |- _] => inverts H; auto
+  end.
 
 Lemma big_step_deterministic : forall e v, e ==>> v -> forall v', e ==>> v' -> v = v'.
 Proof.
-  induction e ; intros v H v' H' ; inverts H ; inverts H' ; value_solver ; eauto.
-  +
-    eapply big_step_value_succ in H0.
-    destruct H0.
-    specialize (IHe _ H0 _ H2).
-    subst ; auto.
-  +
-    eapply big_step_value_succ in H.
-    destruct H.
-    specialize (IHe _ H0 _ H2).
-    subst ; auto.
-  +
-    specialize (IHe _ H2 _ H3).
-    subst ; eauto.
-  +
-    specialize (IHe _ H1 _ H2).
-    subst ; congruence.
-  +
-    specialize (IHe _ H2 _ H0) ; congruence.
-  +
-    specialize (IHe _ H2 _ H3) ; subst.
-    injection IHe ; tauto.
-  +
-    specialize (IHe1 _ H4 _ H3) ; congruence.
-  +
-    specialize (IHe1 _ H4 _ H3) ; congruence.
-  +
-    specialize (IHe _ H1 _ H2) ; congruence.
-  +
-    specialize (IHe _ H2 _ H0) ; congruence.
-  +
-    specialize (IHe1 _ H3 _ H5).
-    injection IHe1 ; intro ; subst.
-    specialize (IHe2 _ H9 _ H6) ; subst ; auto.
-  +
-    specialize (IHe1 _ H3 _ H2) ; congruence.
-  +
-    specialize (IHe1 _ H3 _ H4) ; congruence.
+  induction e ; intros v H v' H' ; inverts H ; inverts H' ; value_solver ; eauto; repeat big_step_solver.
 Qed.
 
 Hint Resolve big_step_deterministic.
@@ -358,22 +339,35 @@ Inductive multi_step : exp -> exp -> Prop :=
 where "e '==>*' e1" := (multi_step e e1).
 
 Hint Constructors multi_step.
-
+(*
+Ltac multi_solver :=
+  match goal with
+    | [H : bvalue _ |- _] => inverts H; subst
+    | [H : nvalue _ |- _] => inverts H; subst
+    | [H : Zero ==>* _ |- _] => inverts H
+    | [H : Zero ==> _ |- _] => inverts H
+    | [_ : _ |- Zero ==>> Zero] => auto
+  end.
+*)
+Lemma nvalue_step : forall e, nvalue e -> e ==>> e.
+Proof.
+  induction e; intros; auto.
+Qed.
+  
 (*Exercicio 53*)
 Lemma multi_step_big_step  : forall e v, value v -> e ==>* v -> e ==>> v.
 Proof.
-  intros.
+  induction e;  intros v Hv; inverts Hv; intros.
+  inversion H; subst.
+  inverts H0.
+  inverts H1.
+  inverts H0.
+  inverts H1.
   inverts H0.
   auto.
-  repeat bs.
-  +
-    inverts H0.
-    inverts H2; inverts H1; auto.
-    ++   
-      inverts H.
-    ++
-      apply B_If_False.
+  inverts H1.
 Admitted.
+
 
 (*Exercicio 54*)
 Lemma big_step_mult_step  : forall e v, value v -> e ==>> v -> e ==>* v.
@@ -421,13 +415,15 @@ Ltac auxs :=
     | [H : F <<- TNat |- _] => inverts H
     | [H : Zero <<- TBool |- _] => inverts H
     | [H : Succ _ <<- TBool |- _] => inverts H
+    | [H : Plus _ _ <<- TBool |- _] => inverts H
+    | [H : And _ _ <<- TNat |- _] => inverts H 
   end.
 
 (*Exercicio 55*)
 Lemma bool_canonical : forall e, e <<- TBool -> value e -> bvalue e.
 Proof.
   induction e; intros; repeat bs; repeat auxs; repeat value_solver.
-Qed.    
+Qed.
 
 (*Exercicio 56*)
 Lemma nat_canonical : forall e, e <<- TNat -> value e -> nvalue e. 
@@ -464,3 +460,6 @@ Theorem has_type_det : forall e t, e <<- t -> forall t', e <<- t' -> t = t'.
 Proof.
   induction 1 ; intros t' Hc ; inverts Hc ; eauto.
 Qed.
+
+Lemma mult_big :
+  forall e t, e <<- t -> forall v, value v -> e ==>* v -> e ==>> v.
