@@ -226,7 +226,7 @@ Inductive big_step : exp -> exp -> Prop :=
 | B_IsZeroSucc
   : forall e nv,
     nvalue nv ->
-    e ==>> nv ->
+    e ==>> (Succ nv) ->
     (IsZero e) ==>> F
 | B_PlusZero
   : forall e1 e2 n,
@@ -251,64 +251,97 @@ where "e '==>>' e1" := (big_step e e1).
 
 Hint Constructors big_step.
 
-Ltac bs :=
-	match goal with
-	| [H : T ==>> _ |- _] => inverts H
-        | [H : F ==>> _ |- _] => inverts H 
-	| [H : Zero ==>> _ |- _] => inverts H
-	| [H : (Succ _) ==>> _ |- _] => inverts H
-	| [H : value _ |- _] => inverts H
-	| [H : bvalue (Succ _) |- _] => inverts H
-	| [H : nvalue (Succ _) |- _] => inverts H
-	| [H : (Pred _) ==>> _ |- _] => inverts H
-	| [H : bvalue (Pred _) |- _] => inverts H
-	| [H : nvalue (Pred _) |- _] => inverts H
-	| [H : (If _ _ _) ==>> _ |- _] => inverts H
-	| [H : bvalue (If _ _ _) |- _] => inverts H
-	| [H : nvalue (If _ _ _) |- _] => inverts H
-	| [H : (IsZero _) ==>> _ |- _] => inverts H
-	| [H : bvalue (IsZero _) |- _] => inverts H
-	| [H : nvalue (IsZero _) |- _] => inverts H
-        | [H : value Zero |- _ ] => inverts H
-        | [H : bvalue Zero |- _ ] => inverts H
-        | [H : nvalue Zero |- _ ] => inverts H
-        | [H : Zero = Succ _ |- _] => inverts H
-        | [H : Succ _ = Zero |- _] => inverts H
-        | [H : (Plus _ _) ==>> _ |- _] => inverts H
-	| [H : bvalue (Plus _ _) |- _] => inverts H
-	| [H : nvalue (Plus _ _) |- _] => inverts H
-        | [H : Succ ?n1 = Succ ?n2 |- ?n2 = ?n1] =>
-          injection H; intros; symmetry; assumption
-        | [H : (And _ _) ==>> _ |- _] => inverts H
-	| [H : bvalue (And _ _) |- _] => inverts H
-	| [H : nvalue (And _ _) |- _] => inverts H
-        | [H : T = F |- _] => inverts H
-        | [H : F = T |- _] => inverts H
-	| [IH : forall v, ?e ==>> v -> forall v', ?e ==>> v' -> _ ,                                  H  : ?e ==>> _,
-           H1 : ?e ==>> _
-                              |- _] => apply (IH _ H) in H1
-	end ; subst ; try f_equal ; auto.
+Ltac bs := match goal with
+            | [H : T ==>> _ |- _] => inverts H
+            | [H : F ==>> _ |- _] => inverts H 
+            | [H : Zero ==>> _ |- _] => inverts H
+            | [H : (Succ _) ==>> _ |- _] => inverts H
+            | [H : value _ |- _] => inverts H
+            | [H : bvalue (Succ _) |- _] => inverts H
+            | [H : nvalue (Succ _) |- _] => inverts H
+            | [H : (Pred _) ==>> _ |- _] => inverts H     
+            | [H : bvalue (Pred _) |- _] => inverts H
+            | [H : nvalue (Pred _) |- _] => inverts H
+            | [H : (If _ _ _) ==>> _ |- _] => inverts H     
+            | [H : bvalue (If _ _ _) |- _] => inverts H
+            | [H : nvalue (If _ _ _) |- _] => inverts H
+            | [H : (IsZero _) ==>> _ |- _] => inverts H     
+            | [H : bvalue (IsZero _) |- _] => inverts H
+            | [H : nvalue (IsZero _) |- _] => inverts H
+            | [H : value (Pred _) |- _] => inverts H
+            | [ IH : forall v, ?e ==>> v -> forall v', ?e ==>> v' -> _
+                , H : ?e ==>> _, H1 : ?e ==>> _ |- _] =>
+              apply (IH _ H) in H1
+            end ; subst ; try congruence ; try f_equal ; auto.
 
-
-Lemma big_step_refl : forall e, e ==>> e.
-  Proof.
-    intros.
-  Admitted.
-
-Hint Resolve big_step_refl.
-
-Lemma exp_contra : F <> T.
+Lemma big_step_value_succ : forall e, value (Succ e) -> nvalue e /\ e ==>> e.
 Proof.
-  intro contra.
-  inversion contra.
-Qed.  
+  induction e ; intros H ; inverts H ; split ; eauto ; repeat bs.
+Qed.
 
-Hint Resolve exp_contra.
-     
+Hint Resolve big_step_value_succ.
+
+Ltac value_solver :=
+  repeat (match goal with
+          | [H : value (Pred _) |- _] => inverts H
+          | [H : bvalue (Pred _) |- _] => inverts H
+          | [H : nvalue (Pred _) |- _] => inverts H
+          | [H : value (If _ _ _) |- _] => inverts H
+          | [H : bvalue (If _ _ _) |- _] => inverts H
+          | [H : nvalue (If _ _ _) |- _] => inverts H
+          | [H : value (IsZero _) |- _] => inverts H
+          | [H : bvalue (IsZero _) |- _] => inverts H
+          | [H : nvalue (IsZero _) |- _] => inverts H
+          | [H : value (Plus _ _) |- _] => inverts H
+          | [H : nvalue (Plus _ _) |- _] => inverts H
+          | [H : bvalue (Plus _ _) |- _] => inverts H
+          | [H : value (And _ _) |- _] => inverts H
+          | [H : nvalue (And _ _) |- _] => inverts H
+          | [H : bvalue (And _ _) |- _] => inverts H
+          | [H : Zero ==>> _ |- _] => inverts H
+          end).
+
 Lemma big_step_deterministic : forall e v, e ==>> v -> forall v', e ==>> v' -> v = v'.
 Proof.
-  induction e ; intros ; repeat bs.
-Admitted.
+  induction e ; intros v H v' H' ; inverts H ; inverts H' ; value_solver ; eauto.
+  +
+    eapply big_step_value_succ in H0.
+    destruct H0.
+    specialize (IHe _ H0 _ H2).
+    subst ; auto.
+  +
+    eapply big_step_value_succ in H.
+    destruct H.
+    specialize (IHe _ H0 _ H2).
+    subst ; auto.
+  +
+    specialize (IHe _ H2 _ H3).
+    subst ; eauto.
+  +
+    specialize (IHe _ H1 _ H2).
+    subst ; congruence.
+  +
+    specialize (IHe _ H2 _ H0) ; congruence.
+  +
+    specialize (IHe _ H2 _ H3) ; subst.
+    injection IHe ; tauto.
+  +
+    specialize (IHe1 _ H4 _ H3) ; congruence.
+  +
+    specialize (IHe1 _ H4 _ H3) ; congruence.
+  +
+    specialize (IHe _ H1 _ H2) ; congruence.
+  +
+    specialize (IHe _ H2 _ H0) ; congruence.
+  +
+    specialize (IHe1 _ H3 _ H5).
+    injection IHe1 ; intro ; subst.
+    specialize (IHe2 _ H9 _ H6) ; subst ; auto.
+  +
+    specialize (IHe1 _ H3 _ H2) ; congruence.
+  +
+    specialize (IHe1 _ H3 _ H4) ; congruence.
+Qed.
 
 Hint Resolve big_step_deterministic.
 
@@ -380,6 +413,8 @@ Inductive has_type : exp -> type -> Prop :=
     (IsZero e) <<- TBool
 where "e '<<-' t" := (has_type e t).
 
+Hint Constructors has_type.
+
 Ltac auxs :=
   match goal with
     | [H : T <<- TNat |- _] => inverts H
@@ -391,13 +426,13 @@ Ltac auxs :=
 (*Exercicio 55*)
 Lemma bool_canonical : forall e, e <<- TBool -> value e -> bvalue e.
 Proof.
-  induction e; intros; repeat bs; repeat auxs.
+  induction e; intros; repeat bs; repeat auxs; repeat value_solver.
 Qed.    
 
 (*Exercicio 56*)
 Lemma nat_canonical : forall e, e <<- TNat -> value e -> nvalue e. 
 Proof.
-  induction e; intros; repeat bs; repeat auxs.
+  induction e; intros; repeat bs; repeat auxs; repeat value_solver.
 Qed.
 
 Theorem progress : forall e t, e <<- t -> value e \/ exists e', e ==> e'.
@@ -419,17 +454,10 @@ Qed.
 
 Theorem preservation : forall e t, e <<- t -> forall e', e ==> e' -> e' <<- t.
 Proof.
-  induction 1 ; intros ; repeat (s ; eauto).
-  inverts H2.
+  induction e ; intros t He e' He' ; inverts He ; inverts He' ; repeat s ; eauto.
   +
-    inverts H.
-    destruct IHhas_type.
-    inverts H5; inverts H3; inverts H6.
-    -
-    repeat (match goal with
-                | [H : _ ==> _ |- _] => inverts H ; eauto
-                | [H : (Succ _) <<- _ |- _] => inverts H ; eauto
-                end).
+    inverts H1 ; eauto.
+    inverts H0 ; eauto.
 Qed.
 
 Theorem has_type_det : forall e t, e <<- t -> forall t', e <<- t' -> t = t'.
